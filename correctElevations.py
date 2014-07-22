@@ -1,3 +1,4 @@
+#! c:python27/ArcGIS10.2/python.exe
 import arcpy, sys
 
 def getModeAvg (arr):
@@ -36,12 +37,13 @@ def getModeAvg (arr):
   return (first[0]*first[1]+second[0]*second[1]+third[0]*third[1])/(first[1]+second[1]+third[1])/100.
 
 def filterOutliers (avg,lines,slope,spread):
+  arcpy.AddMessage("Filtering with slope:"+str(slope))
   cleaned = []
   mid = len(lines)/2
   for i,line in enumerate(lines):
     elev = getElev(line)
-    corr = slope*(mid-i)
-    if abs(elev+corr-avg) <= spread:
+   # corr = slope*(mid-i)
+    if abs(elev-avg) <= spread:
       cleaned.append(line)
   return cleaned
 
@@ -58,13 +60,13 @@ def run(infile, outfile, spread=0.1):
   chunks = []
   start = 0
   end = 100
-  diff = 100
+  diff = 100 #diff allows splitting intervals if there is a large mode difference.
 
   while start < len(lines):
 #    print start,end
     arr = lines[start:end]
-    avg = getModeAvg(arr)
-  #  print avg
+    avg = getModeAvg(arr) #average of modes.. good proxy for 'true' elevation over short timespans
+  # print avg
     if avg:
       chunks.append((avg,(start+end)/2,arr))
   #    print "advance", start,end,diff  
@@ -78,6 +80,7 @@ def run(infile, outfile, spread=0.1):
       end = end-diff
    #   print "failed to", start,end,diff
 
+  #chunks are [mode average, middle value, original array at this chunk's interval]
   for i,chunk in enumerate(chunks):
     if i == 0:
       slope = (chunk[0]-chunks[i+1][0])/(chunk[1]-chunks[i+1][1])

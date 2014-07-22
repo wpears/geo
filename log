@@ -1,0 +1,1 @@
+201311151502   0     4     0wpearsal \\nasgisnp\NCRO\BATH\Testgeo.gdb\Idw_txt_Feat4 = IDW(temprastpoints,  'z', #, 2.0, SAMPLE, 1, 2, 3)

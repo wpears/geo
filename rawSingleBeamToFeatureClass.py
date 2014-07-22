@@ -1,4 +1,4 @@
-#! c:python26/ArcGIS10.0/python.exe
+#! c:python27/ArcGIS10.2/python.exe
 import arcpy, os, sys, correctElevations
 arcpy.CheckOutExtension('3D')
 
@@ -36,7 +36,7 @@ if not input or not feat or not zone:
 inpPath = os.path.realpath(input)
 pathArr = inpPath.split('\\')
 gdbPath = ''
-if overwrite[:1].upper() =="Y" or overwrite == True:
+if overwrite[:1].upper() =="Y" or overwrite == 'true':
   arcpy.env.overwriteOutput = True
   arcpy.AddMessage("Overwriting output: "+str(arcpy.env.overwriteOutput))
 
@@ -62,11 +62,11 @@ out = open('TEMPFILE.csv','w');
 
 
 if len(zone)<4:
-  sr = r'C:\Program Files (x86)\ArcGIS\Desktop10.0\Coordinate Systems\Projected Coordinate Systems\State Plane\NAD 1983 (US Feet)\NAD 1983 StatePlane California III FIPS 0403 (US Feet).prj'
+  sr = r'Coordinate Systems\Projected Coordinate Systems\State Plane\NAD 1983 (US Feet)\NAD 1983 StatePlane California III FIPS 0403 (US Feet).prj'
+  if zone == '2' or zone == 'II':
+   sr = sr.replace('III FIPS 0403','II FIPS 0402')
 else:
   sr = zone
-if zone == '2' or zone == 'II':
-  sr.replace('III FIPS 0403','II FIPS 0402')
 
 
 out.write("y,x,Elevation,Depth,bottom_elevation\n")
@@ -81,7 +81,7 @@ inp.close()
 out.close()
 
 
-if filterElevs[:1].upper() =="Y" or filterElevs == True:
+if filterElevs[:1].upper() =="Y" or filterElevs == 'true':
   correctElevations.run('TEMPFILE.csv','TEMPFILE2.csv',spread)
   arcpy.MakeXYEventLayer_management('TEMPFILE2.csv','x','y','temppoint',sr,'bottom_elevation')
 else:

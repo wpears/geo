@@ -1,4 +1,7 @@
 #! /c/Python27/ArcGIS10.2/python
+
+# Publish updates to services.
+
 print("\nRunning service publisher.\n")
 
 import arcpy
@@ -9,18 +12,39 @@ import getpass
 
 def main(argv=None):
 
-  username = raw_input("Enter user name: ")
+  def doRequest(url,params):
+    httpConn = httplib.HTTPConnection(serverName,serverPort)
+    httpConn.request("POST", url, params, headers)
+
+    response = httpConn.getresponse()
+    if (response.status != 200):
+      httpConn.close()
+      print("Couldn't access the service {} in {} on {}. Check if it exists".format(name,serverFolder,serverName))
+      return None
+    data = response.read()
+    httpConn.close()
+    if not assertJsonSuccess(data):          
+      print("Error returned by operation. " + data)
+      return None
+    return data
+
+
+  username = raw_input("Enter user name: ") or 'wpearsal'
   password = getpass.getpass("Enter password: ")
-  serverName = raw_input("Enter Server name (mrsbmapp...): ") or 'mrsbmapp21164'
+  stagingName = raw_input("Enter Staging Server name (mrsbmapp...): ") or 'mrsbmapp21158'
+  prodName = raw_input("Enter Production Server name (mrsbmapp..._: ") or 'mrsbmapp21188'
   serverPort = 6080
 
   print("\nGetting token...\n")
 
-  token = getToken(username,password,serverName,serverPort)
-  print(token)
+  stagingToken = getToken(username,password,stagingName)
+  prodToken = getToken(username,password,prodName,serverPort)
   if token == None:
     print("Could not generate a token with the username and password provided.")
     return
+
+  params = urllib.urlencode({'token': token, 'f': 'json'})
+  headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
 
   folderPath = path.abspath(raw_input("Enter the path to the folder of MXDs: ") or '.')
   matchParam = raw_input("Enter filter for MXD names (or nothing for all MXDs): ")
@@ -59,27 +83,13 @@ def main(argv=None):
       print("Errors creating service definition",analysis['errors'])
       continue
 
-
-    print("Getting service parameters.\n")
-
     serviceURL = "/arcgis/admin/services/" + serverFolder + "/" + name + ".MapServer"
-    params = urllib.urlencode({'token': token, 'f': 'json'})
-    headers = {"Content-type": "application/x-www-form-urlencoded", "Accept": "text/plain"}
-                    
-    httpJSON = httplib.HTTPConnection(serverName,serverPort)
-    httpJSON.request("POST", serviceURL, params, headers)
+    
 
-    response = httpJSON.getresponse()
-    if (response.status != 200):
-      httpJSON.close()
-      print("Couldn't access the service {} in {} on {}. Check if it exists".format(name,serverFolder,serverName))
+    print("Getting service parameters.\n")             
+    data = doRequest(serviceURL,params)
+    if not data:
       continue
-    data = response.read()
-    httpJSON.close()
-    if not assertJsonSuccess(data):          
-      print("Error returned by operation. " + data)
-      continue
-
 
     if overrideProps != "":
       overrideJSON = json.loads(overrideProps)
@@ -87,25 +97,11 @@ def main(argv=None):
       for key in overrideJSON:
         dataJSON[key] = overrideJSON[key]
       data = json.dumps(dataJSON)
-
     print("Service Parameters saved.\n")
 
 
-
     print("Removing old service.\n")
-
-    httpDelete = httplib.HTTPConnection(serverName,serverPort)
-    httpDelete.request("POST", serviceURL +"/delete", params, headers)
-
-    response = httpDelete.getresponse()
-    if (response.status != 200):
-      httpDelete.close()
-      print("Failed to delete")
-      continue
-    deleteRes = response.read()
-    httpDelete.close()
-    if not assertJsonSuccess(deleteRes):          
-      print("Error returned by operation. " + deleteRes)
+    if not doRequest(serviceURL + "/delete",params):
       continue
     print("Service Removed.\n")
 
@@ -114,24 +110,17 @@ def main(argv=None):
     arcpy.UploadServiceDefinition_server(sd,"GIS Servers/"+gisConnection)
     print("{} published to {} folder on {}\n".format(name,serverFolder,serverName))
 
-    print("Adding saved properties.\n")
-    params = urllib.urlencode({'token': token, 'service':data, 'f': 'json'})
-    httpPublish = httplib.HTTPConnection(serverName,serverPort)
-    httpPublish.request("POST", serviceURL+"/edit", params, headers)
 
-    response = httpPublish.getresponse()
-    if (response.status != 200):
-      httpPublish.close()
-      print("Error while editing the service.")
-      continue
-    publishData = response.read()
-    httpPublish.close()
-    if not assertJsonSuccess(publishData):          
-      print("Error returned by operation. " + publishData)
+    print("Adding saved properties.\n")
+    if not doRequest(serviceURL+"/edit",urllib.urlencode({'token': token, 'service':data, 'f': 'json'})):
       continue
     print("Properties added.\n")
+
+
     print("{} successfully updated.\n".format(name))
 
+
+#end main
 
 
 def getToken(username, password, serverName, serverPort):
